@@ -161,7 +161,7 @@
         ctx.fillText("LEWA RESIDENCE",375,80);ctx.shadowBlur=0;
 
         // photo hexagon
-        const size=180,x=100,y=170;
+        const size=240,x=80,y=140;
         const hex=(cx,cy,r)=>{ctx.beginPath();for(let i=0;i<6;i++){let a=Math.PI/3*i;let px=cx+r*Math.cos(a),py=cy+r*Math.sin(a);i?ctx.lineTo(px,py):ctx.moveTo(px,py);}ctx.closePath();};
         ctx.save(); hex(x+size/2,y+size/2,size/2); ctx.clip();
         if(data.photo){
