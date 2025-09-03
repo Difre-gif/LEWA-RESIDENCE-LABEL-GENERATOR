@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Lewa Residence Label Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;700;900&family=Orbitron:wght@400;700&display=swap');
+    body { font-family: 'Poppins', sans-serif; background-color: #06120b; }
+    .message-box {
+      position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+      padding: 12px 24px; border-radius: 8px; font-weight: bold;
+      z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+      transition: all 0.3s ease-in-out; opacity: 0; visibility: hidden;
+    }
+    .message-box.show {opacity:1;visibility:visible;}
+    .message-box.success {background:#10b981;color:white;}
+    .message-box.error {background:#ef4444;color:white;}
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen py-8 px-4 sm:px-6 lg:px-8 bg-[#06120b]">
+
+  <div id="message-box" class="message-box"></div>
+
+  <div class="w-full max-w-5xl p-8 bg-gray-900 rounded-2xl shadow-2xl flex flex-col md:flex-row gap-8 border border-green-700">
+    <!-- Form -->
+    <div class="w-full md:w-1/2">
+      <h1 class="text-3xl font-extrabold text-white mb-2 text-center">Generate Your Label</h1>
+      <p class="text-sm text-gray-400 mb-6 text-center">Fill your details below to create your personalized ID label.</p>
+      <form id="labelForm" class="space-y-4">
+        <div>
+          <label class="text-sm text-gray-300">Email</label>
+          <input id="studentEmail" type="email" placeholder="e.g. user@example.com"
+            class="w-full p-3 border border-gray-600 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-green-400" required/>
+        </div>
+        <div>
+          <label class="text-sm text-gray-300">Full Name</label>
+          <input id="studentName" type="text" placeholder="e.g. Fredrick Kariuki"
+            class="w-full p-3 border border-gray-600 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-green-400" required/>
+        </div>
+        <div>
+          <label class="text-sm text-gray-300">Class</label>
+          <input id="className" type="text" placeholder="e.g. MYP 5 DUMA"
+            class="w-full p-3 border border-gray-600 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-green-400" required/>
+        </div>
+        <div>
+          <label class="text-sm text-gray-300">House</label>
+          <input id="houseName" type="text" placeholder="e.g. Kilimanjaro"
+            class="w-full p-3 border border-gray-600 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-green-400" required/>
+        </div>
+        <div>
+          <label class="text-sm text-gray-300">Admission No.</label>
+          <input id="admissionNo" type="text" placeholder="e.g. MAS1071"
+            class="w-full p-3 border border-gray-600 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-green-400" required/>
+        </div>
+        <div>
+          <label class="text-sm text-gray-300">Student Photo</label>
+          <input id="studentPhoto" type="file" accept="image/*"
+            class="w-full p-2 border border-gray-600 bg-gray-700 text-white rounded-lg focus:ring-2 focus:ring-green-400"/>
+        </div>
+        <button type="submit"
+          class="w-full py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition">Generate & Save Label</button>
+      </form>
+      <button id="downloadBtn"
+        class="hidden mt-4 w-full py-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-700 transition">Download Label</button>
+    </div>
+
+    <!-- Preview -->
+    <div class="w-full md:w-1/2 flex flex-col items-center">
+      <h2 class="text-xl font-bold text-gray-300 mb-4">Label Preview</h2>
+      <canvas id="labelCanvas" class="border border-gray-700 rounded-xl shadow-lg"></canvas>
+    </div>
+  </div>
+
+  <script>
+    function showMessage(message, type) {
+      const box = document.getElementById('message-box');
+      box.textContent = message;
+      box.className = `message-box show ${type}`;
+      setTimeout(()=> box.classList.remove('show'), 3000);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('labelForm');
+      const canvas = document.getElementById('labelCanvas');
+      const ctx = canvas.getContext('2d');
+      const downloadBtn = document.getElementById('downloadBtn');
+      canvas.width = 750; canvas.height = 500;
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const data = {
+          email: document.getElementById('studentEmail').value.trim().toLowerCase(),
+          name: document.getElementById('studentName').value.trim().toUpperCase(),
+          class: document.getElementById('className').value.trim().toUpperCase(),
+          house: document.getElementById('houseName').value.trim().toUpperCase(),
+          admission: document.getElementById('admissionNo').value.trim().toUpperCase()
+        };
+        const file = document.getElementById('studentPhoto').files[0];
+
+        if (!data.email || !data.name || !data.class || !data.house || !data.admission) {
+          showMessage("Error: All fields must be filled.", "error"); return;
+        }
+
+        const finalize = (photo)=> {
+          drawLabel({...data, photo});
+          // send to server
+          const imageBase64 = canvas.toDataURL("image/png");
+          fetch("/save-label", {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({email: data.email, imageBase64})
+          })
+          .then(res=>res.json())
+          .then(res=>{
+            if(res.success){ showMessage("Label saved successfully!", "success"); }
+            else{ showMessage("Save failed: "+res.message, "error"); }
+          })
+          .catch(()=> showMessage("Error saving to server", "error"));
+        };
+
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = e => { const img = new Image(); img.onload = ()=> finalize(img); img.src = e.target.result; };
+          reader.readAsDataURL(file);
+        } else {
+          finalize(null);
+        }
+      });
+
+      downloadBtn.addEventListener('click', ()=>{
+        const link = document.createElement('a');
+        link.download = 'lewa_label.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
+
+      function drawLabel(data) {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+
+        // background gradient
+        let bg = ctx.createLinearGradient(0,0,750,500);
+        bg.addColorStop(0,'#0a0a0a'); bg.addColorStop(0.5,'#0c1a12'); bg.addColorStop(1,'#082512');
+        ctx.fillStyle = bg; ctx.fillRect(0,0,750,500);
+
+        // grid
+        ctx.strokeStyle='rgba(57,255,20,0.08)'; ctx.lineWidth=1;
+        for (let x=0;x<750;x+=30){ctx.beginPath();ctx.moveTo(x+Math.sin(x/50)*10,0);ctx.lineTo(x-Math.sin(x/50)*10,500);ctx.stroke();}
+        for (let y=0;y<500;y+=30){ctx.beginPath();ctx.moveTo(0,y+Math.sin(y/50)*10);ctx.lineTo(750,y-Math.sin(y/50)*10);ctx.stroke();}
+
+        // purple + orange waves
+        ctx.beginPath();ctx.moveTo(0,200);ctx.lineTo(200,100);ctx.lineTo(450,250);ctx.lineTo(750,150);
+        ctx.strokeStyle='rgba(255,0,255,0.7)';ctx.lineWidth=4;ctx.shadowColor='#FF00FF';ctx.shadowBlur=20;ctx.stroke();
+        ctx.beginPath();ctx.moveTo(750,300);ctx.lineTo(500,400);ctx.lineTo(250,250);ctx.lineTo(0,350);
+        ctx.strokeStyle='rgba(255,69,0,0.7)';ctx.lineWidth=4;ctx.shadowColor='#FF4500';ctx.shadowBlur=20;ctx.stroke(); ctx.shadowBlur=0;
+
+        // Title
+        ctx.font="900 60px 'Poppins'";ctx.fillStyle="#fff";ctx.textAlign="center";
+        ctx.shadowColor="#39FF14";ctx.shadowBlur=30;
+        ctx.fillText("LEWA RESIDENCE",375,80);ctx.shadowBlur=0;
+
+        // photo hexagon
+        const size=180,x=100,y=170;
+        const hex=(cx,cy,r)=>{ctx.beginPath();for(let i=0;i<6;i++){let a=Math.PI/3*i;let px=cx+r*Math.cos(a),py=cy+r*Math.sin(a);i?ctx.lineTo(px,py):ctx.moveTo(px,py);}ctx.closePath();};
+        ctx.save(); hex(x+size/2,y+size/2,size/2); ctx.clip();
+        if(data.photo){
+          const aspect = data.photo.width / data.photo.height;
+          let dw,dh,dx,dy;
+          if(aspect>1){dh=size;dw=dh*aspect;dx=x-(dw-size)/2;dy=y;}
+          else{dw=size;dh=dw/aspect;dx=x;dy=y-(dh-size)/2;}
+          ctx.drawImage(data.photo,dx,dy,dw,dh);
+        } else { ctx.fillStyle="#333";ctx.fillRect(x,y,size,size); }
+        ctx.restore();
+        ctx.strokeStyle="#39FF14";ctx.lineWidth=4;ctx.shadowColor="#39FF14";ctx.shadowBlur=20;
+        hex(x+size/2,y+size/2,size/2);ctx.stroke();ctx.shadowBlur=0;
+
+        // texts
+        let tx=x+size+40;
+        ctx.fillStyle="#fff";ctx.font="900 40px 'Poppins'";ctx.textAlign="left";ctx.fillText(data.name,tx,220);
+        ctx.fillStyle="#aaa";ctx.font="bold 20px 'Poppins'";ctx.fillText(`CLASS: ${data.class}`,tx,280);ctx.fillText(`HOUSE: ${data.house}`,tx,310);
+
+        // admission box
+        ctx.fillStyle="#1e1e1e";ctx.fillRect(tx-10,350,400,40);
+        ctx.strokeStyle="#FF00FF";ctx.lineWidth=2;ctx.strokeRect(tx-10,350,400,40);
+        ctx.fillStyle="#fff";ctx.font="bold 20px 'Poppins'";ctx.fillText(`ADMISSION NO: ${data.admission}`,tx,375);
+
+        // footer
+        ctx.strokeStyle="#39FF14";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x, y+size);ctx.lineTo(x,450);ctx.lineTo(700,450);ctx.stroke();
+        ctx.font="bold 16px 'Orbitron'";ctx.fillStyle="#39FF14";ctx.textAlign="right";ctx.fillText("LEWA RESIDENCE / ID CARD",690,440);
+
+        downloadBtn.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
