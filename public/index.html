@@ -130,11 +130,14 @@
       });
 
       downloadBtn.addEventListener('click', ()=>{
-        const link = document.createElement('a');
-        link.download = 'lewa_label.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-      });
+  const email = document.getElementById('studentEmail').value.trim().toLowerCase();
+  const safeEmail = email.replace(/[^a-z0-9]/gi, "_"); // make filename safe
+  const link = document.createElement('a');
+  link.download = safeEmail + "_label.png";
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
 
       function drawLabel(data) {
         ctx.clearRect(0,0,canvas.width,canvas.height);
